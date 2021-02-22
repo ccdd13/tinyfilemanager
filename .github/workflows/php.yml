@@ -58,23 +58,23 @@ jobs:
         echo ${composer_version_short}
         echo ${composer_version_long}
         echo ${date}
-#        # ${{ steps.getcomposer.output.version1 }}
+#        # ${{ steps.getcomposer.outputs.version1 }}
 
     - name: make pull request
       uses: peter-evans/create-pull-request@v3.8.2
       with:
-        commit-message: get ${{ steps.getcomposer.output.version2 }}
+        commit-message: get ${{ steps.getcomposer.outputs.version2 }}
         committer: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
         author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
         signoff: true
-        branch: get-composer-${{ steps.getcomposer.output.version1 }}
+        branch: get-composer-${{ steps.getcomposer.outputs.version1 }}
         delete-branch: true
         branch-suffix: timestamp
-        title: get ${{ steps.getcomposer.output.version2 }} for ${{ steps.getcomposer.output.date }}
+        title: get ${{ steps.getcomposer.outputs.version2 }} for ${{ steps.getcomposer.outputs.date }}
         body: |
-          get ${{ steps.getcomposer.output.version2 }}
+          get ${{ steps.getcomposer.outputs.version2 }}
           
-          action executed on ${{ steps.getcomposer.output.date }}
+          action executed on ${{ steps.getcomposer.outputs.date }}
           
           Automated changes by [create-pull-request](https://github.com/peter-evans/create-pull-request) GitHub action
         assignees: ${{ github.actor }}
