@@ -10,7 +10,7 @@ on:
 #    branches: [ main ]
 
 jobs:
-  build:
+  getcomposer:
 
     runs-on: ubuntu-latest
 
@@ -24,7 +24,18 @@ jobs:
         sudo apt-get install -y php
         php --version
 
+    - name: Cache Composer packages
+      id: composer-cache
+      uses: actions/cache@v2
+      with:
+        path: vendor
+        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-php-
+
     - name: get composer.phar
+      id: getcomposer
+      shell: bash
       run: |
         rm -fv composer.phar
         curl -sL 'https://getcomposer.org/download/' \
@@ -32,30 +43,35 @@ jobs:
           | sed -Ee 's~<pre\sclass="installer">~\n~i;s~</pre>~\n~ig' \
           | head -n -1 \
           | bash -x
+        echo '\r\n@php "%~dp0composer.phar" %* \r\n' > composer.bat
+        echo '#!/usr/bin/env bash\n\nphp composer.phar "$@"\n' > composer.sh
+        chmod u+x *.sh
+        php --version
+        bash composer.sh -n --version
+        composer_version_short=$(bash composer.sh --version -n | tr ' ' '\n' | head -n 3 | tail -n 1)
+        composer_version_long=$(bash composer.sh --version -n)
+        echo "::set-output name=version1::${composer_version_short}"
+        echo "::set-output name=version2::${composer_version_long}"
+        git add composer.* || echo ok
+        echo "::set-output name=date::$(date '+%a %d %b %Y %X %P')"
+#        # ${{ steps.getcomposer.output.version1 }}
 
-    - name: php
-      uses: franzliedke/gh-action-php@master
+    - name: make pull request
+      uses: peter-evans/create-pull-request@v3.8.2
       with:
-        args: php7.4 composer.phar
-
-#    - name: Validate composer.json and composer.lock
-#      run: composer validate
-
-#    - name: Cache Composer packages
-#      id: composer-cache
-#      uses: actions/cache@v2
-#      with:
-#        path: vendor
-#        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
-#        restore-keys: |
-#          ${{ runner.os }}-php-
-
-#    - name: Install dependencies
-#      if: steps.composer-cache.outputs.cache-hit != 'true'
-#      run: composer install --prefer-dist --no-progress --no-suggest
-
-    # Add a test script to composer.json, for instance: "test": "vendor/bin/phpunit"
-    # Docs: https://getcomposer.org/doc/articles/scripts.md
-
-    # - name: Run test suite
-    #   run: composer run-script test
+        commit-message: get ${{ steps.getcomposer.output.version2 }}
+        committer: ${{ github.actor }}
+        author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+        signoff: true
+        branch: get-composer-${{ steps.getcomposer.output.version1 }}
+        delete-branch: true
+        branch-suffix: timestamp
+        title: get ${{ steps.getcomposer.output.version2 }} for ${{ steps.getcomposer.output.date }}
+        body: |
+          get ${{ steps.getcomposer.output.version2 }}
+          
+          action executed on ${{ steps.getcomposer.output.date }}
+          
+          Automated changes by [create-pull-request](https://github.com/peter-evans/create-pull-request) GitHub action
+        assignees: ${{ github.actor }}
+        reviewers: ${{ github.actor }}
