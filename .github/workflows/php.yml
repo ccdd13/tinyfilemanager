@@ -34,6 +34,8 @@ jobs:
       shell: bash
       run: |
         rm -fv composer.phar
+        date=$(date '+%a %d %b %Y %X %P')
+        echo "::set-output name=date::${date}"
         curl -sL 'https://getcomposer.org/download/' \
           | grep -A 5 -Fhi '<pre class="installer">' \
           | sed -Ee 's~<pre\sclass="installer">~\n~i;s~</pre>~\n~ig' \
@@ -48,15 +50,16 @@ jobs:
         composer_version_long=$(bash composer.sh --version -n)
         echo "::set-output name=version1::${composer_version_short}"
         echo "::set-output name=version2::${composer_version_long}"
-        git add composer.* || echo ok
-        echo "::set-output name=date::$(date '+%a %d %b %Y %X %P')"
+        git add composer.*
+        git status
+        ls -lah --group-directories-first
 #        # ${{ steps.getcomposer.output.version1 }}
 
     - name: make pull request
       uses: peter-evans/create-pull-request@v3.8.2
       with:
         commit-message: get ${{ steps.getcomposer.output.version2 }}
-        committer: ${{ github.actor }}
+        committer: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
         author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
         signoff: true
         branch: get-composer-${{ steps.getcomposer.output.version1 }}
