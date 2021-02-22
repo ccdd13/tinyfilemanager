@@ -3,7 +3,7 @@ name: download composer.phar
 on:
   workflow_dispatch:
   schedule:
-    - cron: 0 0 5 * *
+    - cron: 0 0 5 */3 *
 
 jobs:
   getcomposer:
@@ -41,8 +41,8 @@ jobs:
           | sed -Ee 's~<pre\sclass="installer">~\n~i;s~</pre>~\n~ig' \
           | head -n -1 \
           | bash -x
-        echo -e '\r\n@php "%~dp0composer.phar" %* \r\n' > composer.bat
-        echo -e '#!/usr/bin/env bash\n\nphp composer.phar "$@"\n' > composer.sh
+        echo -e '\r\n@php "%~dp0composer.phar" %*\r\n' > composer.bat
+        echo -e '#!/usr/bin/env bash\n\nphp composer.phar "$@"' > composer.sh
         chmod u+x *.sh
         echo
         php --version
