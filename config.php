@@ -21,14 +21,11 @@ $use_auth = true;
 // Generate secure password hash - https://tinyfilemanager.github.io/docs/pwd.html
 $auth_users = array(
     'admin' => '$2y$10$/K.hjNr84lLNDt8fTXjoI.DBp6PpeyoJ.mGwrrLuCZfAwfSAGqhOW', //admin@123
-    'user' => '$2y$10$Fg6Dz8oH9fPoZ2jJan5tZuv6Z4Kp7avtQ9bDfrdRntXtPeiMAZyGO' //12345
 );
 
 // Readonly users
 // e.g. array('users', 'guest', ...)
-$readonly_users = array(
-    'user'
-);
+$readonly_users = array();
 
 //set application theme
 //options - 'light' and 'dark'
