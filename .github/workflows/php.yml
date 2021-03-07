@@ -1,0 +1,308 @@
+name: download composer.phar
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: 0 0 5 */3 *
+
+jobs:
+
+  getcomposer:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - uses: actions/checkout@v2
+
+    - name: install os util
+      run: sudo apt-get install -y tree
+
+    - name: install php
+      run: |
+        sudo apt-get update  -y
+        sudo apt-get upgrade -y
+        sudo apt-get install -y php
+        echo
+        rm -f composer.phar
+        curl -sL 'https://getcomposer.org/download/' \
+          | sed -nEe '/<pre\sclass="installer">/,/<\/pre>/p' \
+          | sed -Ee 's~(">)~\1\n\n~i;s~(</)~\n\n\1~i;s~^\s+~~i' \
+          | sed -Ee '/^$/d;/^</d' \
+          | bash
+        echo -ne '\r\n@php "%~dp0\composer.phar" %*\r\n' > composer.bat
+        echo -ne '#!/usr/bin/env bash\n\nphp $(dirname "$0")/composer.phar "$@"' > composer.sh
+        chmod u+x *.{sh,phar}
+        mkdir -p bin
+        mv -f *.{sh,bat,phar} ./bin/
+
+    - name: php --version
+      run: php --version
+
+    - name: composer --version
+      run: bash ./bin/composer.sh --version
+
+    - name: Cache Composer packages
+      id: composer-cache
+      uses: actions/cache@v2
+      with:
+        path: vendor
+        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-php-
+
+    - name: get composer.phar
+      id: getcomposer
+      shell: bash
+      run: |
+        # == START-CHECKPOINT-0 == cat .github/workflows/php.yml | sed -nEe '/^\s+#\s==\sSTART-CHECKPOINT-'${id:-0}'\s==\s+.*\s*#\s*$/,/^\s+#\s==\sEND-CHECKPOINT-'${id:-0}'\s==\s#\s*$/p' #
+        if ! cat "${HOME}/.gitconfig" | grep -qEh '^\s+email\s+=' ; then
+          git config user.name  "${GITHUB_ACTOR:-${USER}}"
+          git config user.email "${GITHUB_ACTOR:-${USER}}@users.noreply.github.com"
+        fi
+        rm -f composer.phar
+        date="$(date '+%a %d %b %Y %X %P')"
+        curl -sL 'https://getcomposer.org/download/' \
+          | sed -nEe '/<pre\sclass="installer">/,/<\/pre>/p' \
+          | sed -Ee 's~(">)~\1\n\n~i;s~(</)~\n\n\1~i;s~^\s+~~i' \
+          | sed -Ee '/^$/d;/^</d' \
+          | bash
+        echo -ne '\r\n@php "%~dp0\composer.phar" %*\r\n' > composer.bat
+        echo -ne '#!/usr/bin/env bash\n\nphp $(dirname "$0")/composer.phar "$@"' > composer.sh
+        echo -ne '#!/usr/bin/env bash\n\nzip -r snapshot.zip * .??*' > mksnapshot.sh
+        chmod u+x *.{sh,phar}
+        mkdir -p bin
+        echo && mv -f *.{sh,bat,phar} ./bin/ && echo
+        [ -f .gitignore ] || echo -en '#.gitignore\n' >> .gitignore
+        if ! grep -Eq '/bin/' .gitignore ; then
+          echo -en '\n/bin/\n' >> .gitignore
+        fi
+        username="$(git config --get user.name)"
+        project_name="${GITHUB_REPOSITORY}"
+        [ -z "${project_name}" ] && project_name="${username}/$(basename "$(pwd)")"
+        project_descr="php web application"
+        project_author="${GITHUB_ACTOR:-${username}} <${GITHUB_ACTOR:-${username}}@users.noreply.github.com>"
+        project_homepage="https://github.com/${project_name}"
+        if [[ ! -f composer.json ]] ; then
+          ./bin/composer.sh init -n \
+                                 --name "${project_name,,}" \
+                                 --description "${project_descr}" \
+                                 --author "${project_author}" \
+                                 --type project \
+                                 --homepage "${project_homepage}" \
+                                 --license MIT \
+                                 --stability stable
+          echo
+          ./bin/composer.sh require -n --no-progress --optimize-autoloader --apcu-autoloader --prefer-stable --sort-packages -W 'php:>=5.3.0'
+          echo
+        fi
+        ./bin/composer.sh validate -n
+        echo
+        ./bin/composer.sh install -n --no-progress --optimize-autoloader --apcu-autoloader
+        echo
+        ./bin/composer.sh require -n --no-progress --optimize-autoloader --apcu-autoloader --prefer-stable --sort-packages -W --dev symfony/thanks
+        echo
+        ./bin/composer.sh update  -n --no-progress --optimize-autoloader --apcu-autoloader --prefer-stable -W
+        echo
+        ./bin/composer.sh install -n --no-progress --optimize-autoloader --apcu-autoloader
+        echo
+        ./bin/composer.sh check-platform-reqs -n
+        echo
+        ./bin/composer.sh show -n --self
+        echo
+        ./bin/composer.sh suggests -n --all
+        echo
+        ./bin/composer.sh suggests -n --all > suggests.txt
+        ./bin/composer.sh fund --no-interaction > funding.txt
+        ./bin/composer.sh licenses --no-interaction > licenses.txt
+        if [[ ! -f LICENSE.txt ]] ; then
+          curl -sL 'https://raw.githubusercontent.com/ccdd13/mit-license/main/mit-template.txt' \
+            | sed  -Ee "s~\\[year\\]~$(date '+%Y')~ig;s~\\[fullname\\]~$(echo -n ${GITHUB_ACTOR:-${username}})~ig" \
+            > LICENSE.txt
+        fi
+        [ -f LICENSE ] && mv -f LICENSE LICENSE.txt
+        echo
+        if [[ ! -z "${VERSIONEYE_TOKEN}" ]] ; then
+          curl -sL --http1.1 -X POST https://api.versioneye.com/v1/scans \
+               -H "Authorization: Bearer ${VERSIONEYE_TOKEN}" \
+               -F "pm_file[]=@composer.lock" \
+               -F "license_whitelist=ve-default-lwl" \
+               -F "project_name=${project_name}" \
+          > versioneye-report.json
+        fi
+        echo
+        php --version
+        echo
+        bash ./bin/composer.sh --version
+        echo
+        #
+        if [[ -z "${GITHUB_REPOSITORY}" ]] ; then
+          [ -z "${GITHUB_ENV}" ] && GITHUB_ENV=".githubenv"
+          [ -f "${GITHUB_ENV}" ] || touch "${GITHUB_ENV}"
+        fi
+        #
+        echo "::set-output name=msg_date::${date}"
+        echo
+        [ ! -z "$GITHUB_ENV" ] && echo "MSG_STARTUP_DATE<<EOF" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "${date}" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "EOF" >> $GITHUB_ENV
+        #
+        [ ! -z "$GITHUB_ENV" ] && echo "MSG_PROJECT_INFO<<EOF" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "$(./bin/composer.sh show -n --self -f json)" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "EOF" >> $GITHUB_ENV
+        #
+        [ ! -z "$GITHUB_ENV" ] && echo "MSG_PHP_VERSION<<EOF" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "$(php --version)" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "EOF" >> $GITHUB_ENV
+        #
+        composer_version_short="$(bash ./bin/composer.sh --version | tr ' ' '\n' | head -n 3 | tail -n 1)"
+        echo "::set-output name=msg_composer_version_short::${composer_version_short}"
+        echo
+        [ ! -z "$GITHUB_ENV" ] && echo "MSG_COMPOSER_VERSION_SHORT<<EOF" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "${composer_version_short}" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "EOF" >> $GITHUB_ENV
+        #
+        composer_version_long="$(bash ./bin/composer.sh --version )"
+        echo "::set-output name=msg_composer_version_long::${composer_version_long}"
+        echo
+        [ ! -z "$GITHUB_ENV" ] && echo "MSG_COMPOSER_VERSION_LONG<<EOF" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "${composer_version_long}" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "EOF" >> $GITHUB_ENV
+        #
+        [ ! -z "$GITHUB_ENV" ] && echo "MSG_SUGGESTS<<EOF" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "$(cat suggests.txt)" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "EOF" >> $GITHUB_ENV
+        #
+        [ ! -z "$GITHUB_ENV" ] && echo "MSG_FUNDING<<EOF" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "$(cat funding.txt)" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "EOF" >> $GITHUB_ENV
+        #
+        [ ! -z "$GITHUB_ENV" ] && echo "MSG_LICENSES<<EOF" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "$(cat licenses.txt)" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "EOF" >> $GITHUB_ENV
+        #
+        [ ! -z "$GITHUB_ENV" ] && echo "MSG_VERSIONEYE<<EOF" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "$(cat versioneye-report.json)" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "EOF" >> $GITHUB_ENV
+        #
+        # commit changes
+        if ! cat "${HOME}/.gitconfig" | grep -qEh '^\s+email\s+=' ; then
+          git config user.name  "${GITHUB_ACTOR:-${USER}}"
+          git config user.email "${GITHUB_ACTOR:-${USER}}@users.noreply.github.com"
+        fi
+        echo
+        #
+        git add .gitignore > /dev/null
+        git commit -sm 'add `/bin/` to **.gitignore**' > /dev/null && { msg_task_gitignore_x="X" ; git tag msg_task_gitignore ; } || echo ok > /dev/null
+        #        
+        git add composer.json composer.lock > /dev/null
+        git commit -sm 'update **composer.json** **composer.lock**' > /dev/null && { msg_task_composer_x="X" ; git tag msg_task_composer ; } || echo ok > /dev/null
+        #        
+        git add LICENSE.txt > /dev/null
+        git add LICENSE > /dev/null 2>&1
+        git commit -sm 'update **LICENSE.txt**' > /dev/null && { msg_task_license_x="X" ; git tag msg_task_license ; } || echo ok > /dev/null
+        #        
+        git add licenses.txt > /dev/null
+        git commit -sm 'update **licenses.txt**' > /dev/null && { msg_task_licenses_x="X" ; git tag msg_task_licenses ; } || echo ok > /dev/null
+        #        
+        git add funding.txt > /dev/null
+        git commit -sm 'update **funding.txt**' > /dev/null && { msg_task_funding_x="X" ; git tag msg_task_funding ; } || echo ok > /dev/null
+        #
+        git --no-pager log --all --decorate --oneline --graph --branches --not --remotes
+        echo
+        [ -z "${msg_task_gitignore_x}" ] && msg_task_gitignore_x=' '
+        [ -z "${msg_task_composer_x}" ] && msg_task_composer_x=' '
+        [ -z "${msg_task_license_x}" ] && msg_task_license_x=' '
+        [ -z "${msg_task_licenses_x}" ] && msg_task_licenses_x=' '
+        [ -z "${msg_task_funding_x}" ] && msg_task_funding_x=' '
+        [ ! -z "${msg_task_gitignore_x}" ] && echo "::set-output name=msg_task_gitignore::- [${msg_task_gitignore_x}] add \`/bin/\` to **.gitignore**"
+        [ ! -z "${msg_task_composer_x}" ] && echo "::set-output name=msg_task_composer::- [${msg_task_composer_x}] update **composer.json** **composer.lock**"
+        [ ! -z "${msg_task_license_x}" ] && echo "::set-output name=msg_task_license::- [${msg_task_license_x}] update **LICENSE.txt**"
+        [ ! -z "${msg_task_licenses_x}" ] && echo "::set-output name=msg_task_licenses::- [${msg_task_licenses_x}] update **licenses.txt**"
+        [ ! -z "${msg_task_funding_x}" ] && echo "::set-output name=msg_task_funding::- [${msg_task_funding_x}] update **funding.txt**"
+        echo
+        #
+        [ ! -z "$GITHUB_ENV" ] && echo "MSG_GITAHEAD<<EOF" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "$(git --no-pager log --all --decorate --oneline --graph --branches --not --remotes)" >> $GITHUB_ENV
+        [ ! -z "$GITHUB_ENV" ] && echo "EOF" >> $GITHUB_ENV
+        #
+        git tag -d msg_task_composer msg_task_gitignore msg_task_license msg_task_licenses msg_task_funding > /dev/null 2>&1 || echo ok > /dev/null
+        #
+        if [[ -z "${GITHUB_REPOSITORY}" ]] ; then
+          if [[ -f "${GITHUB_ENV}" ]] ; then
+            cat "${GITHUB_ENV}" \
+              |  sed -zEe 's~([a-zA-Z0-9_]+)<<EOF\n~export \1=$(cat <<'"'"'EOF'"'"'\n~g;s~\nEOF\n~\nEOF\n)\n~g' \
+              > ttt_githubenv.sh \
+              && chmod u+x ttt_githubenv.sh \
+              && source ttt_githubenv.sh \
+              && rm -f ttt_githubenv.sh
+          fi
+        fi
+        #
+        # == END-CHECKPOINT-0 == #
+        #
+
+    - run: ls -lah --group-directories-first
+    - run: tree -a
+
+    - name: make pull request
+      uses: peter-evans/create-pull-request@v3.8.2
+      with:
+        commit-message: automatic commits
+        committer: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+        author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+        signoff: true
+        branch: chore/mixed-changes
+        delete-branch: true
+        branch-suffix: timestamp
+        title: automatic commits ${{ steps.getcomposer.outputs.msg_date }}
+        body: |
+          project info
+          ============
+
+                ```json
+                ${{ env.MSG_PROJECT_INFO }}
+                ```
+
+          checks list
+          ===========
+
+          - [X] `php --version`
+                ```
+                ${{ env.MSG_PHP_VERSION }}
+                ```
+          - [X] `${{ steps.getcomposer.outputs.msg_composer_version_long }}`
+
+          ${{ steps.getcomposer.outputs.msg_task_composer }}
+          ${{ steps.getcomposer.outputs.msg_task_gitignore }}
+          ${{ steps.getcomposer.outputs.msg_task_versioneye }}
+          ${{ steps.getcomposer.outputs.msg_task_license }}
+          ${{ steps.getcomposer.outputs.msg_task_licenses }}
+          ${{ steps.getcomposer.outputs.msg_task_funding }}
+
+          - [X] **git ahead** : `git log --branches --not --remotes`
+                ```
+                ${{ env.MSG_GITAHEAD }}
+                ```
+          - [X] third party ***licenses***
+                ```
+                ${{ env.MSG_LICENSES }}
+                ```
+          - [X] ***funding*** third party
+                ```
+                ${{ env.MSG_FUNDING }}
+                ```
+          - [X] ***suggested*** third party
+                ```
+                ${{ env.MSG_SUGGESTS }}
+                ```
+          - [X] *** Open Source License Compliance & Security*** by [versioneye.com](https://versioneye.com)
+                ```
+                ${{ env.MSG_VERSIONEYE }}
+                ```
+
+          action executed on **${{ steps.getcomposer.outputs.date }}**
+
+          Automated changes by [create-pull-request](https://github.com/peter-evans/create-pull-request) GitHub action
+        assignees: ${{ github.actor }}
+        reviewers: ${{ github.actor }}
