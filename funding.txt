@@ -1,0 +1,10 @@
+The following packages were found in your dependencies which publish funding information:
+
+symfony
+  thanks
+    https://symfony.com/sponsor
+    https://github.com/sponsors/fabpot
+    https://tidelift.com/funding/github/packagist/symfony/symfony
+
+Please consider following these links and sponsoring the work of package authors!
+Thank you!
