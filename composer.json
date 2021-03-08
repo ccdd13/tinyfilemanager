@@ -1,20 +1,20 @@
 {
-    "name": "ccdd13/tinyfilemanager",
-    "description": "php web application",
-    "type": "project",
-    "homepage": "https://github.com/ccdd13/tinyfilemanager",
-    "license": "MIT",
-    "authors": [
-        {
-            "name": "ccdd13",
-            "email": "ccdd13@users.noreply.github.com"
-        }
-    ],
-    "minimum-stability": "stable",
-    "require": {
-        "php": ">=5.3.0"
-    },
-    "require-dev": {
-        "symfony/thanks": "^1.2"
+  "name": "ccdd13/tinyfilemanager",
+  "description": "php web application",
+  "type": "project",
+  "homepage": "https://github.com/ccdd13/tinyfilemanager",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "ccdd13",
+      "email": "ccdd13@users.noreply.github.com"
     }
+  ],
+  "minimum-stability": "stable",
+  "require": {
+    "php": ">=5.3.0"
+  },
+  "require-dev": {
+    "symfony/thanks": "^1.2"
+  }
 }
