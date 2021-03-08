@@ -1,0 +1,7 @@
+Name: ccdd13/tinyfilemanager
+Version: dev-main
+Licenses: MIT
+Dependencies:
+
+Name            Version  License  
+symfony/thanks  v1.2.10  MIT      
